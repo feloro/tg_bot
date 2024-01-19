@@ -9,6 +9,7 @@ class Competitor(BaseModel):
     scoreString: int
     teamName: str
     teamId: int
+    scoreString: int
 
 class VideoLinks(BaseModel):
     videoM3U8: str
@@ -56,3 +57,5 @@ def getGames(startDate, endDate, games):
     return list(filter(lambda game:
         startDate <= datetime.strptime(game.matchTimeMsk, "%Y-%m-%d %H:%M:%S").date() <= endDate,
     games))
+    
+
