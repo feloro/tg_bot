@@ -1,12 +1,10 @@
 import os
 import telebot
 import request
+import db
 from datetime import date, timedelta
-import time
 
 bot = telebot.TeleBot(os.environ.get('BOT_TOKEN'))
-myUser = ""
-
                          
 @bot.message_handler(commands=['today'])
 def send_today_games(message):
@@ -15,10 +13,7 @@ def send_today_games(message):
     responseText = "Игры на сегодня:"
     responseText += formatGames(request.getGames(today, today, games), False)
     bot.send_message(message.from_user.id, responseText, parse_mode= 'Markdown')
-    myUser = message.from_user.id
-    time.sleep(3)
-    bot.send_message(message.from_user.id,"Спишь?")
-    
+
 @bot.message_handler(commands=['soon'])
 def sendSoonGames(message):
     games = request.downloadGames()
@@ -43,6 +38,17 @@ def sendHelp(message):
     today = date.today()
     responseText = """Для того, чтобы получить список матчей на сегодня - /today\nCписок матчей на 5 дней вперед - /soon\nСписок матчей за последние 5 дней - /past"""
     bot.send_message(message.from_user.id, responseText)
+
+@bot.message_handler(commands=['register'])
+def addUserIdToDB(message):
+    if db.getUser(message.from_user.id) is None:
+        db.createUser(message.from_user.id)
+    bot.send_message(message.from_user.id, "Ваш пользователь добавлен в рассылку", parse_mode= 'Markdown')  
+
+@bot.message_handler(commands=['unregister'])
+def addUserIdToDB(message):
+    db.removeUser(message.from_user.id)
+    bot.send_message(message.from_user.id, "Ваш пользователь убран из рассылки", parse_mode= 'Markdown')   
 
 @bot.message_handler(content_types=['text'])
 def getTextMessages(message):

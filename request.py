@@ -1,8 +1,8 @@
 import requests
 
-from pydantic import BaseModel, validator
-from typing import Optional, List, overload
-from datetime import date, datetime
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
 
 class Competitor(BaseModel):
     isHomeCompetitor: bool
