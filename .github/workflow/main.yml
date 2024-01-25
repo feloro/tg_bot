@@ -1,0 +1,36 @@
+name: Upload to S3
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v2
+
+      - name: Deploy Function
+        id: sls-func
+        uses: yc-actions/yc-sls-function@v2
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          bucket: ${{ secrets.BUCKET }}
+          folder-id: 'b1gdpnimj2rp0fuq18s0'
+          function-name: 'python-tg-bot'
+          service-account: 'ajeu1bck1rmgaroum3nq'
+          runtime: 'python312'
+          memory: '128Mb'
+          entrypoint: 'index.handler'
+          secrets: |
+            BOT_TOKEN=e6qfr3sp8blf581r44np/e6q26qhg2pbdq2p6imn6/BOT_TOKEN
+          include: |
+            .
+          exclude: |
+            .github/**/*
+            .git/**/*
+            .git
+            .github
