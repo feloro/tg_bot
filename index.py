@@ -9,14 +9,16 @@ class TriggerPayload(BaseModel):
 
 def handler(event, _):
     print(event)
-    triggerPayload = TriggerPayload(**event)
-    if triggerPayload is None:
+    try:
+        triggerPayload = TriggerPayload(**event)
+        sendMessageToAll()
+    except Exception:
         message = telebot.types.Update.de_json(event['body'])
         bot.bot.process_new_updates([message])
-    return {
-        'statusCode': 200,
-        'body': '!',
-    }
+        return {
+            'statusCode': 200,
+            'body': '!',
+        }
 
 def sendMessageToAll():
     bot.sendInfoToAll()
