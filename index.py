@@ -1,14 +1,26 @@
 #  Copyright (c) ChernV (@otter18), 2021.
 
 import telebot
-from bot import bot
+import bot
+from pydantic import BaseModel
 
+class TriggerPayload(BaseModel):
+    triggerMethodName: str
 
 def handler(event, _):
-    message = telebot.types.Update.de_json(event['body'])
-    bot.process_new_updates([message])
+    print(event)
+    triggerPayload = TriggerPayload(**event)
+    if triggerPayload is None:
+        message = telebot.types.Update.de_json(event['body'])
+        bot.bot.process_new_updates([message])
     return {
         'statusCode': 200,
         'body': '!',
     }
 
+def sendMessageToAll():
+    bot.sendInfoToAll()
+    return {
+        'statusCode': 200,
+        'body': '!',
+    }

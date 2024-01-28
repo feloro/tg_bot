@@ -54,7 +54,13 @@ def addUserIdToDB(message):
 def getTextMessages(message):
     responseText = "Для получения справки воспользуйтесь коммандой - /help"
     bot.send_message(message.from_user.id, responseText)
-    
+
+def sendInfoToAll():
+    users = db.getUsers()
+    for user in users:
+        print(user)
+        if user is not None:
+            bot.send_message(user.user_id, "Успех?")   
     
 def formatGames(games, withScore):
     responseText = ""
@@ -77,4 +83,5 @@ def formatGames(games, withScore):
     return responseText
 
 if __name__ == '__main__':
+    # sendInfoToAll()
     bot.infinity_polling()

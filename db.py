@@ -1,10 +1,14 @@
 import os
 import boto3
+from pydantic import BaseModel
 from botocore.exceptions import ClientError
 
 DB_ACCESS_KEY_ID = os.environ.get('DB_ACCESS_KEY_ID')
 DB_SECRET_ACCESS_KEY = os.environ.get('DB_SECRET_ACCESS_KEY')
 USER_STORAGE_URL = os.environ.get('USER_STORAGE_URL')
+
+class User(BaseModel):
+    user_id: str
 
 def getUser(user_id, dynamodb=None):
     if not dynamodb:
@@ -38,7 +42,11 @@ def getUsers(dynamodb=None):
     except ClientError as e:
         print(e.response['Error']['Message'])
     else:
-        return getattr(response, 'Items', None)
+        users = []
+        for item in response['Items']:
+            users.append(User(**item))
+        print(users)
+        return users
 
 def createUser(userId, dynamodb=None):
     if not dynamodb:
