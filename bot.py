@@ -41,8 +41,11 @@ def sendHelp(message):
 
 @bot.message_handler(commands=['register'])
 def addUserIdToDB(message):
+    print("try to add user")
     if db.getUser(message.from_user.id) is None:
         db.createUser(message.from_user.id)
+    else:
+        print("No user")
     bot.send_message(message.from_user.id, "Ваш пользователь добавлен в рассылку", parse_mode= 'Markdown')  
 
 @bot.message_handler(commands=['unregister'])

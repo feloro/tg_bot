@@ -57,6 +57,7 @@ def createUser(userId, dynamodb=None):
                 aws_access_key_id = DB_ACCESS_KEY_ID,
                 aws_secret_access_key = DB_SECRET_ACCESS_KEY
                 )
+        print("connection is recreated")
 
     table = dynamodb.Table('Users')
     response = table.put_item(
@@ -64,6 +65,7 @@ def createUser(userId, dynamodb=None):
         'user_id': str(userId),
         }
     )
+    print(response)
     return response
 
 def removeUser(userId, dynamodb=None):
