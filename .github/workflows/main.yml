@@ -29,6 +29,7 @@ jobs:
             BOT_TOKEN=e6qfr3sp8blf581r44np/e6q26qhg2pbdq2p6imn6/BOT_TOKEN
             DB_ACCESS_KEY_ID=e6qfr3sp8blf581r44np/e6q5vd1v170p1bpf7h3j/DB_ACCESS_KEY_ID
             DB_SECRET_ACCESS_KEY=e6qfr3sp8blf581r44np/e6q5vd1v170p1bpf7h3j/DB_SECRET_ACCESS_KEY
+            USER_STORAGE_URL=e6qfr3sp8blf581r44np/e6qprbegulf4gjuopdg3/USER_STORAGE_URL
           include: |
             .
           exclude: |
