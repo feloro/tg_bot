@@ -58,12 +58,14 @@ def getTextMessages(message):
     responseText = "Для получения справки воспользуйтесь коммандой - /help"
     bot.send_message(message.from_user.id, responseText)
 
-def sendInfoToAll():
+def sendInfoToAll(matchId):
     users = db.getUsers()
-    for user in users:
-        print(user)
-        if user is not None:
-            bot.send_message(user.user_id, "Успех?")   
+    games = request.downloadGames() 
+    neededGame = next((item for item in games if item.matchId == matchId), None)
+    if neededGame is not None:
+        for user in users:
+            if user is not None:
+                bot.send_message(user.user_id, formatGames([neededGame], False), parse_mode= 'Markdown')   
     
 def formatGames(games, withScore):
     responseText = ""
