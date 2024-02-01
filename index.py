@@ -10,7 +10,7 @@ class TriggerPayload(BaseModel):
 def handler(event, _):
     print(event)
     try:
-        triggerPayload = TriggerPayload(**event)
+        triggerPayload = TriggerPayload(**event['details']['payload'])
         sendMessageToAll()
     except Exception:
         message = telebot.types.Update.de_json(event['body'])
