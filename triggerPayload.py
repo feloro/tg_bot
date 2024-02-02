@@ -3,4 +3,4 @@ from typing import Optional
 
 class TriggerPayload(BaseModel):
     triggerMethodName: str
-    matchId: Optional[int]
+    matchId: Optional[int] = None
