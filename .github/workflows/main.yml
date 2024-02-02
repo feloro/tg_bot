@@ -30,6 +30,9 @@ jobs:
             DB_ACCESS_KEY_ID=e6qfr3sp8blf581r44np/e6q5vd1v170p1bpf7h3j/DB_ACCESS_KEY_ID
             DB_SECRET_ACCESS_KEY=e6qfr3sp8blf581r44np/e6q5vd1v170p1bpf7h3j/DB_SECRET_ACCESS_KEY
             USER_STORAGE_URL=e6qfr3sp8blf581r44np/e6qprbegulf4gjuopdg3/USER_STORAGE_URL
+            SERVICE_ACCOUNT_ID=e6qfr3sp8blf581r44np/e6qtj1s2vcat7ltq1aai/SERVICE_ACCOUNT_ID
+            SERVELESS_FUNCTION_ID=e6qfr3sp8blf581r44np/e6qtj1s2vcat7ltq1aai/SERVELESS_FUNCTION_ID
+            FOLDER_ID=e6qfr3sp8blf581r44np/e6qtj1s2vcat7ltq1aai/FOLDER_ID
           include: |
             .
           exclude: |

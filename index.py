@@ -1,13 +1,8 @@
-#  Copyright (c) ChernV (@otter18), 2021.
-
 import telebot
 import bot
-from pydantic import BaseModel
+from triggerPayload import TriggerPayload
+import triggers as triggers
 import json
-
-class TriggerPayload(BaseModel):
-    triggerMethodName: str
-    matchId: int
 
 def handler(event, _):
     triggerPayload = None
@@ -19,7 +14,10 @@ def handler(event, _):
         print(inst)
         
     if triggerPayload is not None:
-        bot.sendInfoToAll(triggerPayload.matchId)
+        if triggerPayload.triggerMethodName == "sendInfoToAll":
+            bot.sendInfoToAll(triggerPayload.matchId)
+        elif triggerPayload.triggerMethodName == "createTriggers":
+            triggers.createTriggers()
     else:
         message = telebot.types.Update.de_json(event['body'])
         bot.bot.process_new_updates([message])
