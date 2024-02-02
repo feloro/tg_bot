@@ -60,7 +60,7 @@ def createTriggers():
 def generateIAMToken():
     url = 'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token'
     headers = {'Metadata-Flavor': 'Google'}
-    resp = requests.get(url, headers=headers)
+    resp = requests.get(url, headers=headers).json()
     return resp['access_token']
 
 def deleteAutoTriggers(accessToken):
