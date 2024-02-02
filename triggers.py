@@ -38,7 +38,7 @@ def createTriggers():
     deleteAutoTriggers(accessToken)
 
     games = request.downloadGames()
-    today = date.today() + timedelta(days=-5)
+    today = date.today()
     todayGames = request.getGames(today, today, games)
 
     
