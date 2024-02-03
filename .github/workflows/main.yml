@@ -24,6 +24,7 @@ jobs:
           service-account: 'ajeu1bck1rmgaroum3nq'
           runtime: 'python312'
           memory: '128Mb'
+          execution-timeout: 15
           entrypoint: 'index.handler'
           secrets: |
             BOT_TOKEN=e6qfr3sp8blf581r44np/e6q26qhg2pbdq2p6imn6/BOT_TOKEN
