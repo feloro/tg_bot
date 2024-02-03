@@ -45,6 +45,7 @@ def createTriggers():
     for game in todayGames:
         parsedGameTime = datetime.strptime(game.matchTimeMsk, "%Y-%m-%d %H:%M:%S")
         parsedGameTime = parsedGameTime + timedelta(minutes=-15)
+        parsedGameTime = parsedGameTime + timedelta(hours=-3)
         cronTime = parsedGameTime.strftime("%M %H ? * * *")
 
         payload = TriggerPayload(triggerMethodName="sendInfoToAll", matchId=game.matchId).model_dump_json()
