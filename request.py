@@ -7,8 +7,8 @@ from datetime import datetime
 class Competitor(BaseModel):
     isHomeCompetitor: bool
     scoreString: int
-    teamName: str
-    teamId: int
+    teamName: str = "TBA"
+    teamId: int = -1
     scoreString: int
 
 class VideoLinks(BaseModel):
