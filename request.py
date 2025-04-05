@@ -16,7 +16,7 @@ class Competitor(BaseModel):
     isHomeCompetitor: bool
     scoreString: int
     teamName: TeamNameLocale
-    teamId: int
+    teamId: int = -1
     scoreString: int
 
 class Game(BaseModel):
