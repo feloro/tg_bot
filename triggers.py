@@ -43,7 +43,7 @@ def createTriggers():
 
     
     for game in todayGames:
-        parsedGameTime = datetime.strptime(game.matchTimeMsk, "%Y-%m-%d %H:%M:%S")
+        parsedGameTime = datetime.strptime(game.matchTimeMSK, "%Y-%m-%dT%H:%M:%S%z")
         parsedGameTime = parsedGameTime + timedelta(minutes=-15)
         parsedGameTime = parsedGameTime + timedelta(hours=-3)
         cronTime = parsedGameTime.strftime("%M %H ? * * *")

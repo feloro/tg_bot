@@ -2,14 +2,39 @@ import os
 import telebot
 import request
 import db
+import logging
+import time
+import datetime
+from pythonjsonlogger import jsonlogger
 from datetime import date, timedelta
 
 bot = telebot.TeleBot(os.environ.get('BOT_TOKEN'))
                          
+class YcLoggingFormatter(jsonlogger.JsonFormatter):
+    def add_fields(self, log_record, record, message_dict):
+        super(YcLoggingFormatter, self).add_fields(log_record, record, message_dict)
+        log_record['logger'] = record.name
+        log_record['level'] = str.replace(str.replace(record.levelname, "WARNING", "WARN"), "CRITICAL", "FATAL")
+
+logHandler = logging.StreamHandler()
+logHandler.setFormatter(YcLoggingFormatter('%(message)s %(level)s %(logger)s'))
+
+logger = logging.getLogger('MyLogger')
+logger.propagate = False
+logger.addHandler(logHandler)
+logger.setLevel(logging.DEBUG)
+
+
 @bot.message_handler(commands=['today'])
 def send_today_games(message):
+    username = message.from_user.username
+    timestamp = datetime.datetime.fromtimestamp(time.time())
+    logMessage = "function {} by {} at {}".format(message.text, username, timestamp)
+
+    logger.info(logMessage)
     games = request.downloadGames()
     today = date.today()
+    
     responseText = "Игры на сегодня:"
     responseText += formatGames(request.getGames(today, today, games), False)
     bot.send_message(message.from_user.id, responseText, parse_mode= 'Markdown')
@@ -81,7 +106,7 @@ def formatGames(games, withScore):
             homeCompetitor = game.competitors[1]
             guestCompetitor = game.competitors[0]
         timeStart = game.startTime() or ""
-        responseText += "\n*{}* - *{}* \n*Начало матча:* {} \n*Ссылка на транляцию:* {}".format(homeCompetitor.teamName, guestCompetitor.teamName, timeStart, videoUrl)
+        responseText += "\n*{}* - *{}* \n*Начало матча:* {} \n*Ссылка на транляцию:* {}".format(homeCompetitor.teamName.ru, guestCompetitor.teamName.ru, timeStart, videoUrl)
         if withScore:
             responseText += "\nCчет: ||{} : {}||".format(homeCompetitor.scoreString, guestCompetitor.scoreString)
         responseText += "\n\n"

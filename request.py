@@ -4,58 +4,82 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
+class TeamNameLocale(BaseModel):
+    ru: str
+    en: str
+
+class Season(BaseModel):
+    isCurrent: bool
+    season: int
+
 class Competitor(BaseModel):
     isHomeCompetitor: bool
     scoreString: int
-    teamName: str
+    teamName: TeamNameLocale
     teamId: int
     scoreString: int
 
-class VideoLinks(BaseModel):
-    videoM3U8: str
-    videoForWebview: str
-    videoIdFrame: str
-
 class Game(BaseModel):
-    competitionId: int
     matchId: int
     matchStatus: str
-    matchTimeMsk: str
-    video: Optional[VideoLinks] = None
+    matchTimeMSK: str
+    _videoUrl: Optional[str] = None
     competitors: List[Competitor] = []
-
-    def videoUrl(self):
-        if self.video is not None:
-            baseUrl = self.video.videoForWebview.replace(self.video.videoIdFrame,"")
-            path = self.video.videoM3U8.split("/start/",1)[1]
-            path = path.replace(".m3u8","")
-            return baseUrl+path+"?width=100%25&height=100%25&lang=ru&new_html5=1" or None
-        else:
-            return None
             
+    def videoUrl(self):
+        if self._videoUrl is None :
+            self._videoUrl = getVideoURL(self.matchId)
+            return self._videoUrl
+        else:
+            return self._videoUrl 
+
     def startTime(self):
-        if self.matchTimeMsk is not None:
-            return datetime.strptime(self.matchTimeMsk, "%Y-%m-%d %H:%M:%S").strftime("%H:%M %d.%m")
+        if self.matchTimeMSK is not None:
+            return datetime.strptime(self.matchTimeMSK, "%Y-%m-%dT%H:%M:%S%z").strftime("%H:%M %d.%m")
         else:
             return None
 
 def downloadGames():
     games = []
-    url = "https://api.vtb-league.com/a49755699622d8fe2d87e6d2ac24a7bb/v1/competitions/games"
+
+    season = getCurrentSeason()
+    url = "https://api.vtb-league.com/v2/leagues/vtb/seasons/{}/matches".format(season.season)
     payload = {"limit": 500}
     response = requests.get(url, params=payload)
     response_json = response.json()
 
-    for game in response_json["data"]:
-        games.append(Game(**game))
+    for gameJSON in response_json["data"]:
+        game = Game(**gameJSON)
+        games.append(game)
     return games
+
+def getVideoURL(matchId):
+    matchUrl = "https://api.vtb-league.com/v2/matches/{}/info".format(matchId)
+    response = requests.get(matchUrl)
+    response_json = response.json()
+    try:
+        return response_json["data"]["broadcast"]["iframeUrl"]
+    except KeyError:
+        return None
+    
+
+def getCurrentSeason():
+    url = "https://api.vtb-league.com/v2/leagues/vtb/seasons"
+    payload = {"limit": 100, "fields": "isCurrent,season"}
+    response = requests.get(url, params=payload)
+    response_json = response.json()
+
+    for seasonJson in response_json["data"]:
+        season = Season(**seasonJson)
+        if season.isCurrent:
+            return season
 
 def getFinishedGames(games):
     return list(filter(lambda game: game.matchStatus == "COMPLETE", games))
 
 def getGames(startDate, endDate, games):
     return list(filter(lambda game:
-        startDate <= datetime.strptime(game.matchTimeMsk, "%Y-%m-%d %H:%M:%S").date() <= endDate,
+        startDate <= datetime.strptime(game.matchTimeMSK, "%Y-%m-%dT%H:%M:%S%z").date() <= endDate,
     games))
     
 
