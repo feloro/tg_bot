@@ -41,6 +41,11 @@ def send_today_games(message):
 
 @bot.message_handler(commands=['soon'])
 def sendSoonGames(message):
+    username = message.from_user.username
+    timestamp = datetime.datetime.fromtimestamp(time.time())
+    logMessage = "function {} by {} at {}".format(message.text, username, timestamp)
+
+    logger.info(logMessage)
     games = request.downloadGames()
     today = date.today()
     dateEnd = today + timedelta(days=5)
@@ -50,6 +55,11 @@ def sendSoonGames(message):
     
 @bot.message_handler(commands=['past'])
 def sendTodayGames(message):
+    username = message.from_user.username
+    timestamp = datetime.datetime.fromtimestamp(time.time())
+    logMessage = "function {} by {} at {}".format(message.text, username, timestamp)
+
+    logger.info(logMessage)
     games = request.downloadGames()
     today = date.today()
     startDate = today + timedelta(days=-5)
@@ -66,6 +76,11 @@ def sendHelp(message):
 
 @bot.message_handler(commands=['register'])
 def addUserIdToDB(message):
+    username = message.from_user.username
+    timestamp = datetime.datetime.fromtimestamp(time.time())
+    logMessage = "function {} by {} at {}".format(message.text, username, timestamp)
+
+    logger.info(logMessage)
     print("try to add user")
     if db.getUser(message.from_user.id) is None:
         db.createUser(message.from_user.id)
@@ -75,6 +90,11 @@ def addUserIdToDB(message):
 
 @bot.message_handler(commands=['unregister'])
 def addUserIdToDB(message):
+    username = message.from_user.username
+    timestamp = datetime.datetime.fromtimestamp(time.time())
+    logMessage = "function {} by {} at {}".format(message.text, username, timestamp)
+
+    logger.info(logMessage)
     db.removeUser(message.from_user.id)
     bot.send_message(message.from_user.id, "Ваш пользователь убран из рассылки", parse_mode= 'Markdown')   
 
