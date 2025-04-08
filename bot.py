@@ -119,16 +119,19 @@ def formatGames(games, withScore):
             videoUrl = "[Ссылка]({})".format(game.videoUrl())
         else:
             videoUrl = "Отсутствует"
-        if game.competitors[0].isHomeCompetitor:
-            homeCompetitor = game.competitors[0]
-            guestCompetitor = game.competitors[1]
-        else:
-            homeCompetitor = game.competitors[1]
-            guestCompetitor = game.competitors[0]
         timeStart = game.startTime() or ""
-        responseText += "\n*{}* - *{}* \n*Начало матча:* {} \n*Ссылка на транляцию:* {}".format(homeCompetitor.teamName.ru, guestCompetitor.teamName.ru, timeStart, videoUrl)
-        if withScore:
-            responseText += "\nCчет: ||{} : {}||".format(homeCompetitor.scoreString, guestCompetitor.scoreString)
+        if game.competitors is not None:
+            if game.competitors[0].isHomeCompetitor:
+                homeCompetitor = game.competitors[0]
+                guestCompetitor = game.competitors[1]
+            else:
+                homeCompetitor = game.competitors[1]
+                guestCompetitor = game.competitors[0]
+            responseText += "\n*{}* - *{}* \n*Начало матча:* {} \n*Ссылка на транляцию:* {}".format(homeCompetitor.teamName.ru, guestCompetitor.teamName.ru, timeStart, videoUrl)
+            if withScore:
+                responseText += "\nCчет: ||{} : {}||".format(homeCompetitor.scoreString, guestCompetitor.scoreString)
+        else:
+                responseText += "\n*TBA* - *TBA* \n*Начало матча:* {} \n*Ссылка на транляцию:* {}".format(timeStart, videoUrl)
         responseText += "\n\n"
     return responseText
 

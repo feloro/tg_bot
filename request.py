@@ -24,7 +24,7 @@ class Game(BaseModel):
     matchStatus: str
     matchTimeMSK: str
     _videoUrl: Optional[str] = None
-    competitors: List[Competitor] = []
+    competitors: Optional[List[Competitor]] = None
             
     def videoUrl(self):
         if self._videoUrl is None :
