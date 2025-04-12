@@ -15,7 +15,7 @@ class Season(BaseModel):
 class Competitor(BaseModel):
     isHomeCompetitor: bool
     scoreString: int
-    teamName: TeamNameLocale
+    teamName: Optional[TeamNameLocale] = None
     teamId: int = -1
     scoreString: int
 

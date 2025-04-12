@@ -127,7 +127,7 @@ def formatGames(games, withScore):
             else:
                 homeCompetitor = game.competitors[1]
                 guestCompetitor = game.competitors[0]
-            responseText += "\n*{}* - *{}* \n*Начало матча:* {} \n*Ссылка на транляцию:* {}".format(homeCompetitor.teamName.ru, guestCompetitor.teamName.ru, timeStart, videoUrl)
+            responseText += "\n*{}* - *{}* \n*Начало матча:* {} \n*Ссылка на транляцию:* {}".format(homeCompetitor.teamName.ru or "TBA", guestCompetitor.teamName.ru or "TBA", timeStart, videoUrl)
             if withScore:
                 responseText += "\nCчет: ||{} : {}||".format(homeCompetitor.scoreString, guestCompetitor.scoreString)
         else:
