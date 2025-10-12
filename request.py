@@ -40,10 +40,13 @@ class Game(BaseModel):
             return None
 
 def downloadGames():
+    return downloadGamesByLeague("vtb") + downloadGamesByLeague("wbc")
+
+def downloadGamesByLeague(league):
     games = []
 
-    season = getCurrentSeason()
-    url = "https://api.vtb-league.com/v2/leagues/vtb/seasons/{}/matches".format(season.season)
+    season = getCurrentSeason(league)
+    url = "https://api.vtb-league.com/v2/leagues/{}/seasons/{}/matches".format(league, season.season)
     payload = {"limit": 500}
     response = requests.get(url, params=payload)
     response_json = response.json()
@@ -54,7 +57,7 @@ def downloadGames():
     return games
 
 def getVideoURL(matchId):
-    matchUrl = "https://api.vtb-league.com/v2/matches/{}/info".format(matchId)
+    matchUrl = "https://api.vtb-league.com/v2/matches/{}/info?fields=broadcast".format(matchId)
     response = requests.get(matchUrl)
     response_json = response.json()
     try:
@@ -63,8 +66,8 @@ def getVideoURL(matchId):
         return None
     
 
-def getCurrentSeason():
-    url = "https://api.vtb-league.com/v2/leagues/vtb/seasons"
+def getCurrentSeason(league):
+    url = "https://api.vtb-league.com/v2/leagues/{}/seasons".format(league)
     payload = {"limit": 100, "fields": "isCurrent,season"}
     response = requests.get(url, params=payload)
     response_json = response.json()
@@ -78,6 +81,9 @@ def getFinishedGames(games):
     return list(filter(lambda game: game.matchStatus == "COMPLETE", games))
 
 def getGames(startDate, endDate, games):
+    for game in games:
+        if game.matchTimeMSK is None:
+            print(game)
     return list(filter(lambda game:
         startDate <= datetime.strptime(game.matchTimeMSK, "%Y-%m-%dT%H:%M:%S%z").date() <= endDate,
     games))
