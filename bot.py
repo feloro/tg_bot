@@ -103,15 +103,27 @@ def getTextMessages(message):
     responseText = "Для получения справки воспользуйтесь коммандой - /help"
     bot.send_message(message.from_user.id, responseText)
 
+Исправь код, чтобы при попытке отправить сообщение не происходило падение, а корректная обработка ошибки
+
 def sendInfoToAll(matchId):
     users = db.getUsers()
     games = request.downloadGames() 
     neededGame = next((item for item in games if item.matchId == matchId), None)
+
     if neededGame is not None:
         for user in users:
-            if user is not None:
-                bot.send_message(user.user_id, formatGames([neededGame], False), parse_mode= 'Markdown')   
-    
+            if user is None:
+                continue
+
+            try:
+                bot.send_message(
+                    user.user_id,
+                    formatGames([neededGame], False),
+                    parse_mode='Markdown'
+                )
+            except Exception as e:
+                print(f"Ошибка при отправке пользователю {user.user_id}: {e}")
+                   
 def formatGames(games, withScore):
     responseText = ""
     for game in games:
