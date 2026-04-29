@@ -103,8 +103,6 @@ def getTextMessages(message):
     responseText = "Для получения справки воспользуйтесь коммандой - /help"
     bot.send_message(message.from_user.id, responseText)
 
-Исправь код, чтобы при попытке отправить сообщение не происходило падение, а корректная обработка ошибки
-
 def sendInfoToAll(matchId):
     users = db.getUsers()
     games = request.downloadGames() 
