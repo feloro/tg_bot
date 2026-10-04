@@ -6,13 +6,26 @@ import type { Env } from "../types/env";
 import { broadcastInstant } from "../util/datetime";
 import { formatGames } from "./gameFormatter";
 
-const USERS_PER_CHUNK = 32;
+/**
+ * Workers Free allows 50 subrequests per invocation. A chunk costs one send per
+ * user, up to four API calls when the schedule is refreshed, and a handful of
+ * D1 queries, so 20 leaves a wide margin under the cap.
+ */
+const USERS_PER_CHUNK = 20;
 
 const MAX_CONCURRENT_SENDS = 6;
 
 const CHUNK_RETRY_DELAY_SECONDS = 1;
 
 const EARLY_TOLERANCE_MS = 60 * 1000;
+
+/**
+ * Broadcast links are published shortly before the match, well inside the six
+ * hour cache window the commands use. Refreshing at broadcast time picks them
+ * up, while the chunks queued right after reuse the freshly written cache
+ * instead of downloading the season once per chunk.
+ */
+const BROADCAST_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 
 async function claimChunk(
   env: Env,
@@ -65,7 +78,7 @@ export async function broadcastMatch(
   }
 
   const chunkIndex = Math.floor(offset / USERS_PER_CHUNK);
-  const game = await findGame(env, matchId);
+  const game = await findGame(env, matchId, BROADCAST_CACHE_MAX_AGE_MS);
   if (game === undefined) {
     logger.warn(`match ${matchId} not found in schedule, broadcast skipped`);
     return;
@@ -85,7 +98,7 @@ export async function broadcastMatch(
     return;
   }
 
-  const text = await formatGames([game], false);
+  const text = formatGames([game], false);
   await sendInBatches(env, users, text);
   logger.info(`match ${matchId}: sent chunk ${chunkIndex} to ${users.length} users`);
 

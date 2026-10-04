@@ -1,4 +1,3 @@
-import { videoUrl } from "../api/vtb";
 import type { Competitor, Game } from "../types/vtb";
 import { formatStartTime } from "../util/datetime";
 
@@ -6,15 +5,29 @@ function teamName(competitor: Competitor): string {
   return competitor.teamName?.ru || "TBA";
 }
 
-export async function formatGames(
+/**
+ * The provider appends utm tracking parameters whose underscores the legacy
+ * Markdown parse mode used by /today, /soon and the broadcast treats as
+ * emphasis delimiters, which makes Telegram reject the message. The tracking
+ * parameters carry no meaning here, so the query string is dropped.
+ */
+function broadcastLink(game: Game): string {
+  const raw = game.customValues?.externalBroadcast?.url;
+  if (raw === undefined || raw === "") {
+    return "Отсутствует";
+  }
+  const clean = raw.split("?")[0] ?? raw;
+  return `[Ссылка](${clean})`;
+}
+
+export function formatGames(
   games: readonly Game[],
   withScore: boolean,
-): Promise<string> {
+): string {
   let responseText = "";
 
   for (const game of games) {
-    const url = await videoUrl(game);
-    const link = url === null ? "Отсутствует" : `[Ссылка](${url})`;
+    const link = broadcastLink(game);
     const timeStart = formatStartTime(game.matchTimeMSK) ?? "";
 
     const competitors = game.competitors;

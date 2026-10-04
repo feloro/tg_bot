@@ -11,7 +11,8 @@ const LEAGUES = ["vtb", "wbc"] as const;
 
 const API_BASE = "https://api.vtb-league.com/v2";
 
-const MATCH_FIELDS = "matchId,matchStatus,matchTimeMSK,competitors";
+const MATCH_FIELDS =
+  "matchId,matchStatus,matchTimeMSK,competitors,customValues.externalBroadcast.url";
 
 const seasonsResponseSchema = z.object({
   data: z.array(seasonSchema),
@@ -19,14 +20,6 @@ const seasonsResponseSchema = z.object({
 
 const matchesResponseSchema = z.object({
   data: z.array(gameSchema),
-});
-
-const broadcastResponseSchema = z.object({
-  data: z
-    .object({
-      broadcast: z.object({ iframeUrl: z.string() }).nullish(),
-    })
-    .nullish(),
 });
 
 async function getJson(url: string): Promise<unknown> {
@@ -59,27 +52,6 @@ export async function downloadGamesByLeague(league: string): Promise<Game[]> {
 export async function downloadGames(): Promise<Game[]> {
   const byLeague = await Promise.all(LEAGUES.map(downloadGamesByLeague));
   return byLeague.flat();
-}
-
-export async function getVideoURL(matchId: number): Promise<string | null> {
-  const url = `${API_BASE}/matches/${matchId}/info?fields=broadcast`;
-  const parsed = broadcastResponseSchema.safeParse(await getJson(url));
-  if (!parsed.success) {
-    return null;
-  }
-  return parsed.data.data?.broadcast?.iframeUrl ?? null;
-}
-
-const videoUrlCache = new WeakMap<Game, string | null>();
-
-export async function videoUrl(game: Game): Promise<string | null> {
-  const cached = videoUrlCache.get(game);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const url = await getVideoURL(game.matchId);
-  videoUrlCache.set(game, url);
-  return url;
 }
 
 export function getFinishedGames(games: readonly Game[]): Game[] {
