@@ -22,6 +22,12 @@ export const gameSchema = z.object({
   matchStatus: z.string(),
   matchTimeMSK: z.string(),
   competitors: z.array(competitorSchema).nullish(),
+  // Absent on every match the provider has not published a stream for yet, so
+  // both levels must accept undefined. The url is deliberately not validated as
+  // a URL: a single malformed value would otherwise fail the whole season parse.
+  customValues: z
+    .object({ externalBroadcast: z.object({ url: z.string() }).nullish() })
+    .nullish(),
 });
 
 export type TeamNameLocale = z.infer<typeof teamNameLocaleSchema>;

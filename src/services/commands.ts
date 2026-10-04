@@ -30,7 +30,7 @@ async function sendTodayGames(
   logCommand(message);
   const games = await getSchedule(env);
   const day = today();
-  const text = `Игры на сегодня:${await formatGames(getGames(day, day, games), false)}`;
+  const text = `Игры на сегодня:${formatGames(getGames(day, day, games), false)}`;
   await sendMessage(env, message.chatId, text, "Markdown");
 }
 
@@ -38,7 +38,7 @@ async function sendSoonGames(env: Env, message: IncomingMessage): Promise<void> 
   logCommand(message);
   const games = await getSchedule(env);
   const day = today();
-  const text = `Игры в ближайшие 5 дней:${await formatGames(
+  const text = `Игры в ближайшие 5 дней:${formatGames(
     getGames(day, addDays(day, 5), games),
     false,
   )}`;
@@ -49,7 +49,7 @@ async function sendPastGames(env: Env, message: IncomingMessage): Promise<void> 
   logCommand(message);
   const games = await getSchedule(env);
   const day = today();
-  const formatted = await formatGames(
+  const formatted = formatGames(
     getGames(addDays(day, -5), day, games),
     true,
   );

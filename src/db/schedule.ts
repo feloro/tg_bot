@@ -4,11 +4,14 @@ import type { Game } from "../types/vtb";
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
-async function readCache(env: Env): Promise<Game[] | null> {
+async function readCache(
+  env: Env,
+  maxAgeMs: number,
+): Promise<Game[] | null> {
   const row = await env.DB.prepare(
     "SELECT payload, fetched_at FROM schedule_cache WHERE id = 1",
   ).first<{ payload: string; fetched_at: number }>();
-  if (row === null || Date.now() - row.fetched_at > CACHE_TTL_MS) {
+  if (row === null || Date.now() - row.fetched_at > maxAgeMs) {
     return null;
   }
   return JSON.parse(row.payload) as Game[];
@@ -27,8 +30,11 @@ async function writeCache(env: Env, games: readonly Game[]): Promise<void> {
  * A full season download costs several ms of the Free tier's 10 ms CPU budget, so
  * the result is cached in D1 and the hourly cron only pays for a ~30 kB read.
  */
-export async function getSchedule(env: Env): Promise<Game[]> {
-  const cached = await readCache(env);
+export async function getSchedule(
+  env: Env,
+  maxAgeMs = CACHE_TTL_MS,
+): Promise<Game[]> {
+  const cached = await readCache(env, maxAgeMs);
   if (cached !== null) {
     return cached;
   }
@@ -40,7 +46,8 @@ export async function getSchedule(env: Env): Promise<Game[]> {
 export async function findGame(
   env: Env,
   matchId: number,
+  maxAgeMs = CACHE_TTL_MS,
 ): Promise<Game | undefined> {
-  const games = await getSchedule(env);
+  const games = await getSchedule(env, maxAgeMs);
   return games.find((game) => game.matchId === matchId);
 }

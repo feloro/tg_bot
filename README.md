@@ -14,12 +14,12 @@ with D1 and Queues.
 | Subscribers | D1 `users` table |
 | Delayed broadcast | Cloudflare Queue with `delaySeconds` |
 | Schedule polling | Wrangler cron, hourly at :05 |
-| Season schedule cache | D1 `schedule_cache` table, 6 h TTL |
+| Season schedule cache | D1 `schedule_cache` table, 6 h TTL, 30 min for broadcasts |
 
 ```
 scheduled (hourly)  ->  download season schedule  ->  queue message per match
                                                           delay = start - 15 min
-queue (consumer)    ->  load subscribers in chunks of 32  ->  send broadcast
+queue (consumer)    ->  load subscribers in chunks of 20  ->  send broadcast
 ```
 
 An hourly cron runs `downloadGames()` (cached in D1 for 6 hours) and publishes a
@@ -172,18 +172,38 @@ Telegram.
 5. CI deploys on every push to `master` and needs two repository secrets:
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
+## Broadcast links
+
+The Python version asked `GET /v2/matches/{id}/info?fields=broadcast` for an iframe
+URL. That endpoint now answers `{"data":{}}` for every match, so the lookup could
+never succeed; Python additionally crashed on the missing key, because
+`data["broadcast"]` is `None` and `None["iframeUrl"]` raises `TypeError` while only
+`KeyError` is caught.
+
+The link is now read straight from the matches response at
+`customValues.externalBroadcast.url`, which also removes one request per match.
+Three things are worth knowing:
+
+- **Most matches have no link yet.** In the current 2027 season 27 of 143 matches
+  carry one, and providers publish them shortly before tip-off. That is why the
+  broadcast path refreshes the schedule with a 30 minute tolerance instead of the
+  six hour window the commands use.
+- **The tracking parameters are dropped.** The provider appends `utm_*` values
+  whose underscores the legacy Markdown parse mode used by `/today`, `/soon` and
+  the broadcast treats as emphasis delimiters, which makes Telegram reject the
+  whole message.
+- **The link requires a Kinopoisk subscription.** It points at a Yandex SSO wall
+  and only opens for paying viewers. That is a provider limitation.
+
+This is the one deliberate divergence from the Python output: Python always
+printed "Отсутствует".
+
 ## Known gaps carried over from the Python version
 
-These are intentionally left as they are, so the TypeScript output matches the
-Python output byte for byte. They are the obvious follow-ups.
+Apart from broadcast links above, these are intentionally left as they are so the
+TypeScript output keeps matching the Python output byte for byte. They are the
+obvious follow-ups.
 
-- **Broadcast links are always missing.** The bot asks
-  `GET /v2/matches/{id}/info?fields=broadcast` for an iframe URL, but the endpoint
-  now answers `{"data":{}}`, so `videoUrl()` returns `null` and every message shows
-  "Отсутствует". The Python version crashed outright here, because `data["broadcast"]`
-  is `None` and `None["iframeUrl"]` raises `TypeError` while only `KeyError` is
-  caught. The link now lives in `customValues.externalBroadcast.url` on the matches
-  response, which `downloadGamesByLeague` already fetches.
 - `/today`, `/soon`, `/past` filter against `date.today()` in UTC while match times
   are Moscow time. A match between 00:00 and 03:00 MSK lands on the previous day.
 - A match with a single competitor is skipped silently.
