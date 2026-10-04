@@ -67,7 +67,7 @@ async function publish(env: Env, pending: PendingMatch[], now: number) {
  * rescheduled match gets a fresh message instead of being silently skipped.
  */
 export async function enqueueUpcomingMatches(env: Env): Promise<void> {
-  const games = await getSchedule(env);
+  const { games } = await getSchedule(env);
   const now = Date.now();
   const horizon = now + MAX_QUEUE_DELAY_SECONDS * 1000;
   const already = await getEnqueuedKeys(env);

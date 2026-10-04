@@ -13,7 +13,9 @@ The bot runs as a TypeScript Cloudflare Worker with D1 and Queues.
 | Subscribers | D1 `users` table |
 | Delayed broadcast | Cloudflare Queue with `delaySeconds` |
 | Schedule polling | Wrangler cron, hourly at :05 |
-| Season schedule cache | D1 `schedule_cache` table, 6 h TTL, 30 min for broadcasts |
+| Schedule freshness | Live VTB request for each schedule command, cron run, and broadcast start |
+| Schedule backup | D1 `schedule_cache`, used only by commands when VTB is unavailable |
+| Current season IDs | D1 `season_cache`, independent 24 h TTL for each league |
 
 ```
 scheduled (hourly)  ->  download season schedule  ->  queue message per match
@@ -21,12 +23,39 @@ scheduled (hourly)  ->  download season schedule  ->  queue message per match
 queue (consumer)    ->  load subscribers in chunks of 20  ->  send broadcast
 ```
 
-An hourly cron runs `downloadGames()` (cached in D1 for 6 hours) and publishes a
+An hourly cron fetches the live season schedule and publishes a
 queue message for every match whose broadcast instant falls inside the next 24
 hours, which is the maximum `delaySeconds`. Later hourly runs pick up the matches
 that were still out of range, so the 24-hour cap never causes a missed match.
 `enqueued_matches` keys on `(match_id, fire_at)` so repeated runs are idempotent
 and a rescheduled match gets a fresh message.
+
+Schedule commands always attempt a live download, with a 10-second timeout per
+upstream request. A successful download updates the last-known-good backup in D1.
+If the download fails, commands may show that backup with an explicit warning and
+its UTC update time; if no backup is available, they report temporary unavailability.
+There is no TTL or age limit on this explicitly labeled emergency backup.
+Backup write failures are logged but do not prevent using a successful live response.
+Cron and broadcasts never use the stale backup.
+
+Only the current season ID is cached, separately for `vtb` and `wbc`. The first
+request after 24 hours refreshes it; no background refresh is needed. Match data
+is still downloaded on every schedule request: normally two VTB API calls instead
+of four. A season switch may take up to 24 hours to be noticed. Expired season IDs
+are not used if their refresh fails. Cache write failures are logged and do not
+discard a freshly fetched season. Apply `0002_season_cache.sql` before deployment.
+
+Match requests project only consumed fields: ID, status, start time, home/away
+flag, score, Russian team name, and broadcast URL. In particular, `competitors`
+is projected through nested field paths rather than fetching complete team objects.
+
+The first broadcast chunk fetches live data and prepares the notification text.
+Continuation messages carry that text and its fetch time, avoiding repeated season
+downloads for every chunk. Snapshots at least five minutes old are refreshed and
+the match is rechecked before sending. Missing, completed, or not-yet-due matches
+are skipped. A failed broadcast refresh throws before claiming the chunk, allowing
+Queue retries rather than sending stale backup data. This freshness change does
+not change the existing chunk-claim or Telegram delivery guarantees.
 
 ## Commands
 
@@ -45,12 +74,12 @@ Workers **Free** plan. Relevant limits and how this project stays inside them:
 
 | Limit | Value | How it is respected |
 | --- | --- | --- |
-| Subrequests per invocation | 50 | Broadcasts are chunked to 20 recipients |
+| Subrequests per invocation | 50 | 20 recipients plus 2 VTB requests (4 on season cache misses) before retries; Telegram retries can exceed this budget |
 | Simultaneous connections | 6 | `sendMessage` concurrency capped at 6 |
 | Cron triggers per account | 5 | One cron |
 | Queue `delaySeconds` | 86400 | Hourly cron re-queues the remainder |
 | Queue message retention (Free) | 24 h | Enqueued messages are always delivered inside a day |
-| CPU per invocation | 10 ms | Season download is cached in D1 |
+| CPU per invocation | 10 ms | Selected upstream fields; broadcast text reused across chunks; live download CPU must be measured |
 
 ## Local development
 
@@ -68,6 +97,37 @@ TELEGRAM_API_BASE="https://api.telegram.org"
 ```
 
 ### End-to-end test
+
+`npm test` runs deterministic schedule-policy tests with mocked VTB, Telegram,
+D1, and Queue calls. It checks live refreshes, command fallback, strict cron and
+broadcast refreshes, snapshot reuse/expiration, and refresh failures without network
+access. `npm run typecheck` checks the Worker source.
+
+### Measuring JSON and validation cost
+
+Run `npm run bench:vtb` to download real match responses using the Worker's URLs,
+field selection, and Zod schema, then measure `JSON.parse`, Zod validation of
+already-decoded JSON, and both together. The script reports median, p95 elapsed
+time and mean process CPU per iteration after warmup. It does not use bot secrets
+or D1, and excludes network/body-reading time from the measurements. These are
+Node measurements for identifying expensive stages, not the production CPU budget.
+
+Run `npm run bench:vtb -- --compare-fields` to additionally fetch the previous
+full-competitor responses, verify that all consumed match fields are identical,
+and compare byte sizes and parsing costs. This makes two additional API requests;
+if live match data changes between requests, rerun the comparison.
+
+For a profile in the actual local Workers runtime, run `npm run dev`, press `D`,
+open the DevTools Profiler, start recording, issue several schedule commands, and
+stop recording after their Telegram replies arrive. Inspect JSON decoding, Zod
+parsing, backup serialization, and formatting in the bottom-up view. Use a separate
+test bot or the Telegram mock. Compare cold season-cache requests with warm ones.
+
+Do not use `performance.now()` or `Date.now()` around synchronous parsing as a
+production CPU meter: deployed Workers only advance those clocks after I/O, so
+they may report zero. In production compare invocation CPU (not wall time) in
+Workers Logs/metrics for the same command type, including p95 and `exceededCpu`
+outcomes. Local runtimes/hardware and sampling differ from Cloudflare production.
 
 `npm run e2e` drives the real production path with no token and no network to
 Telegram:
@@ -168,7 +228,8 @@ Telegram.
      -d secret_token=<TELEGRAM_WEBHOOK_SECRET>
    ```
 
-5. CI deploys on every push to `master` and needs two repository secrets:
+5. CI tests, applies remote D1 migrations, and deploys on every push to `master`.
+   It needs two repository secrets:
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
 ## Broadcast links
@@ -178,8 +239,8 @@ response. Three things are worth knowing:
 
 - **Most matches have no link yet.** In the current 2027 season 27 of 143 matches
   carry one, and providers publish them shortly before tip-off. That is why the
-  broadcast path refreshes the schedule with a 30 minute tolerance instead of the
-  six hour window the commands use.
+   broadcast path fetches live data before preparing the first chunk, rather than
+   relying on a TTL-based season cache.
 - **The tracking parameters are dropped.** The provider appends `utm_*` values
   whose underscores the Markdown mode used by `/today`, `/soon` and the
   broadcast treats as emphasis delimiters, which makes Telegram reject the whole

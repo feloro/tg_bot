@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const teamNameLocaleSchema = z.object({
   ru: z.string(),
-  en: z.string(),
 });
 
 export const seasonSchema = z.object({
@@ -14,7 +13,6 @@ export const competitorSchema = z.object({
   isHomeCompetitor: z.boolean(),
   scoreString: z.number(),
   teamName: teamNameLocaleSchema.nullish(),
-  teamId: z.number().default(-1),
 });
 
 export const gameSchema = z.object({

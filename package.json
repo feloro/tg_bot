@@ -8,6 +8,8 @@
     "poll": "node scripts/poller.ts",
     "mock": "node scripts/mock-telegram.ts",
     "e2e": "node scripts/e2e.ts",
+    "test": "node --test scripts/test-schedule.ts",
+    "bench:vtb": "node scripts/bench-vtb.ts",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261001.1",
+    "esbuild": "0.28.1",
     "typescript": "^5.7.0",
     "wrangler": "^4.0.0"
   },

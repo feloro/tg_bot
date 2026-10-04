@@ -1,6 +1,10 @@
 export interface MatchBroadcastMessage {
   matchId: number;
   offset: number;
+  snapshot?: {
+    text: string;
+    fetchedAt: number;
+  };
 }
 
 export interface Env {

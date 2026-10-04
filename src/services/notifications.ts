@@ -1,15 +1,16 @@
 import { sendMessage } from "../api/telegram";
-import { findGame } from "../db/schedule";
+import { getSchedule } from "../db/schedule";
 import { getUsersChunk } from "../db/users";
 import { logger } from "../logger";
-import type { Env } from "../types/env";
+import type { Env, MatchBroadcastMessage } from "../types/env";
 import { broadcastInstant } from "../util/datetime";
 import { formatGames } from "./gameFormatter";
 
 /**
  * Workers Free allows 50 subrequests per invocation. A chunk costs one send per
- * user, up to four API calls when the schedule is refreshed, and a handful of
- * D1 queries, so 20 leaves a wide margin under the cap.
+ * user before Telegram retries, plus two API calls for matches (four on a season
+ * cache miss).
+ * Rate-limit retries can exceed the cap; chunking alone does not bound them.
  */
 const USERS_PER_CHUNK = 20;
 
@@ -19,13 +20,7 @@ const CHUNK_RETRY_DELAY_SECONDS = 1;
 
 const EARLY_TOLERANCE_MS = 60 * 1000;
 
-/**
- * Broadcast links are published shortly before the match, well inside the six
- * hour cache window the commands use. Refreshing at broadcast time picks them
- * up, while the chunks queued right after reuse the freshly written cache
- * instead of downloading the season once per chunk.
- */
-const BROADCAST_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+const SNAPSHOT_MAX_AGE_MS = 5 * 60 * 1000;
 
 async function claimChunk(
   env: Env,
@@ -69,28 +64,30 @@ async function sendInBatches(env: Env, users: string[], text: string) {
  */
 export async function broadcastMatch(
   env: Env,
-  matchId: number,
-  offset: number,
+  message: MatchBroadcastMessage,
 ): Promise<void> {
+  const { matchId, offset } = message;
   const users = await getUsersChunk(env, offset, USERS_PER_CHUNK);
   if (users.length === 0) {
     return;
   }
 
   const chunkIndex = Math.floor(offset / USERS_PER_CHUNK);
-  const game = await findGame(env, matchId, BROADCAST_CACHE_MAX_AGE_MS);
-  if (game === undefined) {
-    logger.warn(`match ${matchId} not found in schedule, broadcast skipped`);
-    return;
-  }
-
-  // A message queued for an old start time fires early once the league reschedules.
-  const fireAt = broadcastInstant(game.matchTimeMSK);
-  if (Date.now() < fireAt - EARLY_TOLERANCE_MS) {
-    logger.warn(
-      `match ${matchId} is not due yet (${new Date(fireAt).toISOString()}), broadcast skipped`,
-    );
-    return;
+  let snapshot = message.snapshot;
+  if (snapshot === undefined || Date.now() - snapshot.fetchedAt >= SNAPSHOT_MAX_AGE_MS) {
+    const { games, fetchedAt } = await getSchedule(env);
+    const game = games.find((item) => item.matchId === matchId);
+    if (game === undefined || game.matchStatus === "COMPLETE") {
+      logger.warn(`match ${matchId} unavailable or completed, broadcast skipped`);
+      return;
+    }
+    // A message queued for an old start time may fire before the rescheduled match.
+    const fireAt = broadcastInstant(game.matchTimeMSK);
+    if (!Number.isFinite(fireAt) || Date.now() < fireAt - EARLY_TOLERANCE_MS) {
+      logger.warn(`match ${matchId} is not due yet or has an invalid start time, broadcast skipped`);
+      return;
+    }
+    snapshot = { text: formatGames([game], false), fetchedAt };
   }
 
   if (!(await claimChunk(env, matchId, chunkIndex))) {
@@ -98,13 +95,12 @@ export async function broadcastMatch(
     return;
   }
 
-  const text = formatGames([game], false);
-  await sendInBatches(env, users, text);
+  await sendInBatches(env, users, snapshot.text);
   logger.info(`match ${matchId}: sent chunk ${chunkIndex} to ${users.length} users`);
 
   if (users.length === USERS_PER_CHUNK) {
     await env.MATCH_BROADCASTS.send(
-      { matchId, offset: offset + USERS_PER_CHUNK },
+      { matchId, offset: offset + USERS_PER_CHUNK, snapshot },
       { delaySeconds: CHUNK_RETRY_DELAY_SECONDS },
     );
   }
