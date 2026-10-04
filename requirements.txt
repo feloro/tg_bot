@@ -1,4 +1,0 @@
-pyTelegramBotAPI
-pydantic
-boto3
-python-json-logger==2.0.4
