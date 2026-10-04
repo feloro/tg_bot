@@ -1,0 +1,48 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "tg-bot",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-08-01",
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		"crons": [
+			"5 * * * *"
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "users",
+			"database_id": "b99c3ab1-1227-4821-b1d4-0fb38a5c8b7b",
+			"migrations_dir": "migrations"
+		},
+		{
+			"binding": "users",
+			"database_name": "users",
+			"database_id": "b99c3ab1-1227-4821-b1d4-0fb38a5c8b7b"
+		}
+	],
+	"queues": {
+		"producers": [
+			{
+				"binding": "MATCH_BROADCASTS",
+				"queue": "match-broadcasts"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "match-broadcasts",
+				"max_batch_size": 1,
+				"max_batch_timeout": 30,
+				"max_retries": 3,
+				"dead_letter_queue": "match-broadcasts-dlq"
+			}
+		]
+	},
+	"vars": {
+		"TELEGRAM_API_BASE": "https://api.telegram.org",
+		"TELEGRAM_WEBHOOK_SECRET": ""
+	}
+}

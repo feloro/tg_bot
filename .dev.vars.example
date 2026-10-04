@@ -1,0 +1,9 @@
+# Copy to .dev.vars and fill in a real bot token.
+# .dev.vars is git-ignored and only used by `wrangler dev`.
+
+# From @BotFather
+BOT_TOKEN=""
+
+# Point this at a local mock instead to capture outgoing messages offline:
+# TELEGRAM_API_BASE="http://127.0.0.1:8788"
+TELEGRAM_API_BASE="https://api.telegram.org"

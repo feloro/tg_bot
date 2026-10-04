@@ -1,3 +1,9 @@
-__pycache__/bot.cpython-312.pyc
-__pycache__/db.cpython-312.pyc
-__pycache__/request.cpython-312.pyc
+__pycache__/
+*.pyc
+.venv/
+
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+.env
