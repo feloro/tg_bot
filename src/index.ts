@@ -69,7 +69,7 @@ export default {
     env: Env,
   ): Promise<void> {
     for (const message of batch.messages) {
-      await broadcastMatch(env, message.body.matchId, message.body.offset);
+      await broadcastMatch(env, message.body);
       message.ack();
     }
   },
