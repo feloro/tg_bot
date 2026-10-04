@@ -6,10 +6,9 @@ function teamName(competitor: Competitor): string {
 }
 
 /**
- * The provider appends utm tracking parameters whose underscores the legacy
- * Markdown parse mode used by /today, /soon and the broadcast treats as
- * emphasis delimiters, which makes Telegram reject the message. The tracking
- * parameters carry no meaning here, so the query string is dropped.
+ * The provider appends utm tracking parameters whose underscores Markdown
+ * treats as emphasis delimiters, which makes Telegram reject the message. The
+ * tracking parameters carry no meaning here, so the query string is dropped.
  */
 function broadcastLink(game: Game): string {
   const raw = game.customValues?.externalBroadcast?.url;
