@@ -8,7 +8,7 @@ import {
   type Game,
   type Season,
 } from "../types/vtb";
-import { matchDate } from "../util/datetime";
+import { matchDate, matchInstant } from "../util/datetime";
 
 const LEAGUES = ["vtb", "wbc"] as const;
 
@@ -92,5 +92,5 @@ export function getGames(
   return games.filter((game) => {
     const day = matchDate(game.matchTimeMSK);
     return startDate <= day && day <= endDate;
-  });
+  }).sort((a, b) => matchInstant(a.matchTimeMSK) - matchInstant(b.matchTimeMSK));
 }

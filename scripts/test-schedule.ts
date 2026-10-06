@@ -11,7 +11,7 @@ const bundle = await build({
       export { handleMessage } from './src/services/commands';
       export { broadcastMatch } from './src/services/notifications';
       export { enqueueUpcomingMatches } from './src/scheduler/enqueue';
-      export { getCurrentSeason, matchesResponseSchema, downloadScheduledGames } from './src/api/vtb';
+      export { getCurrentSeason, matchesResponseSchema, downloadScheduledGames, getGames } from './src/api/vtb';
       export { formatGames } from './src/services/gameFormatter';
     `,
     resolveDir: fileURLToPath(new URL("../", import.meta.url)),
@@ -21,7 +21,7 @@ const bundle = await build({
   format: "esm",
   write: false,
 });
-const { getSchedule, handleMessage, broadcastMatch, enqueueUpcomingMatches, getCurrentSeason, matchesResponseSchema, downloadScheduledGames, formatGames } =
+const { getSchedule, handleMessage, broadcastMatch, enqueueUpcomingMatches, getCurrentSeason, matchesResponseSchema, downloadScheduledGames, getGames, formatGames } =
   await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
 
 function fixture() {
@@ -149,6 +149,52 @@ test("projected competitors preserve schedule and score formatting", () => {
     assert.match(text, /Away/);
     assert.match(text, /https:\/\/example.com\/live/);
     if (withScore) assert.match(text, /92 : 68/);
+  }
+});
+
+test("date filtering sorts by start instant without mutating the source", () => {
+  const { state } = fixture();
+  const games = [
+    { ...state.game, matchId: 1, matchTimeMSK: "2026-10-07T15:00:00+03:00" },
+    { ...state.game, matchId: 2, matchTimeMSK: "2026-10-06T15:00:00+03:00" },
+    { ...state.game, matchId: 3, matchTimeMSK: "2026-10-06T13:00:00Z" },
+    { ...state.game, matchId: 4, matchTimeMSK: "2026-10-06T14:00:00+03:00" },
+  ];
+  assert.deepEqual(getGames("2026-10-06", "2026-10-06", games).map((game) => game.matchId), [4, 2, 3]);
+  assert.deepEqual(games.map((game) => game.matchId), [1, 2, 3, 4]);
+});
+
+test("soon and past replies interleave both leagues chronologically", async (t) => {
+  for (const command of ["/soon", "/past"]) {
+    await t.test(command, async (t) => {
+      const { state, env, fetchMock } = fixture();
+      const base = new Date();
+      base.setUTCHours(12, 0, 0, 0);
+      const games = ["Early", "Middle", "Late"].map((name, index) => {
+        const start = new Date(base);
+        start.setUTCDate(start.getUTCDate() + index + (command === "/past" ? -3 : 0));
+        return {
+          ...state.game,
+          matchId: index + 1,
+          matchTimeMSK: start.toISOString(),
+          competitors: state.game.competitors.map((competitor) => ({
+            ...competitor, teamName: { ru: `${name}${competitor.isHomeCompetitor ? "Home" : "Away"}` },
+          })),
+        };
+      });
+      t.mock.method(globalThis, "fetch", async (input: string, init?: RequestInit) => {
+        const response = await fetchMock(input, init);
+        const url = String(input);
+        if (!url.includes("/matches?")) return response;
+        return Response.json({ data: url.includes("/leagues/vtb/") ? [games[2], games[0]] : [games[1]] });
+      });
+      await handleMessage(env, { chatId: 1, username: "test", text: command });
+      assert.equal(state.sent.length, 1);
+      const text = state.sent[0].text;
+      const positions = ["EarlyHome", "MiddleHome", "LateHome"].map((name) => text.indexOf(name));
+      assert.ok(positions.every((position) => position >= 0));
+      assert.ok(positions[0] < positions[1] && positions[1] < positions[2]);
+    });
   }
 });
 
