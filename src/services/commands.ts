@@ -25,18 +25,12 @@ function logCommand(message: IncomingMessage): void {
 
 async function getCommandSchedule(env: Env, chatId: number): Promise<Schedule | null> {
   try {
-    return await getSchedule(env, true);
+    return await getSchedule(env);
   } catch (error) {
     logger.error(`schedule unavailable: ${String(error)}`);
     await sendMessage(env, chatId, "Расписание временно недоступно, попробуйте позже");
     return null;
   }
-}
-
-function scheduleWarning(schedule: Schedule): string {
-  if (!schedule.stale) return "";
-  const updatedAt = new Date(schedule.fetchedAt).toISOString();
-  return `Не удалось обновить расписание; резервные данные от ${updatedAt}\n\n`;
 }
 
 async function sendTodayGames(
@@ -48,7 +42,7 @@ async function sendTodayGames(
   if (schedule === null) return;
   const { games } = schedule;
   const day = today();
-  const text = `${scheduleWarning(schedule)}Игры на сегодня:${formatGames(getGames(day, day, games), false)}`;
+  const text = `Игры на сегодня:${formatGames(getGames(day, day, games), false)}`;
   await sendMessage(env, message.chatId, text, "Markdown");
 }
 
@@ -58,7 +52,7 @@ async function sendSoonGames(env: Env, message: IncomingMessage): Promise<void> 
   if (schedule === null) return;
   const { games } = schedule;
   const day = today();
-  const text = `${scheduleWarning(schedule)}Игры в ближайшие 5 дней:${formatGames(
+  const text = `Игры в ближайшие 5 дней:${formatGames(
     getGames(day, addDays(day, 5), games),
     false,
   )}`;
@@ -78,7 +72,7 @@ async function sendPastGames(env: Env, message: IncomingMessage): Promise<void> 
   await sendMessage(
     env,
     message.chatId,
-    escapeMarkdownV2(`${scheduleWarning(schedule)}Игры за прошедшие 5 дней:${formatted}`),
+    escapeMarkdownV2(`Игры за прошедшие 5 дней:${formatted}`),
     "MarkdownV2",
   );
 }

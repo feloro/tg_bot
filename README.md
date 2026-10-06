@@ -14,7 +14,6 @@ The bot runs as a TypeScript Cloudflare Worker with D1 and Queues.
 | Delayed broadcast | Cloudflare Queue with `delaySeconds` |
 | Schedule polling | Wrangler cron, hourly at :05 |
 | Schedule freshness | Live VTB request for each schedule command, cron run, and broadcast start |
-| Schedule backup | D1 `schedule_cache`, used only by commands when VTB is unavailable |
 | Current season IDs | D1 `season_cache`, independent 24 h TTL for each league |
 
 ```
@@ -31,12 +30,9 @@ that were still out of range, so the 24-hour cap never causes a missed match.
 and a rescheduled match gets a fresh message.
 
 Schedule commands always attempt a live download, with a 10-second timeout per
-upstream request. A successful download updates the last-known-good backup in D1.
-If the download fails, commands may show that backup with an explicit warning and
-its UTC update time; if no backup is available, they report temporary unavailability.
-There is no TTL or age limit on this explicitly labeled emergency backup.
-Backup write failures are logged but do not prevent using a successful live response.
-Cron and broadcasts never use the stale backup.
+upstream request. If the download fails, commands report temporary unavailability.
+Match responses are not saved to D1. The legacy `schedule_cache` table is no longer
+read or written; existing migrations and stored rows are left unchanged.
 
 Only the current season ID is cached, separately for `vtb` and `wbc`. The first
 request after 24 hours refreshes it; no background refresh is needed. Match data
@@ -45,7 +41,9 @@ of four. A season switch may take up to 24 hours to be noticed. Expired season I
 are not used if their refresh fails. Cache write failures are logged and do not
 discard a freshly fetched season. Apply `0002_season_cache.sql` before deployment.
 
-Match requests project only consumed fields: ID, status, start time, home/away
+Cron requests and validates only match ID and start time, reducing JSON decoding
+and validation work without changing the scheduling window or deduplication.
+Command and broadcast requests project only consumed fields: ID, status, start time, home/away
 flag, score, Russian team name, and broadcast URL. In particular, `competitors`
 is projected through nested field paths rather than fetching complete team objects.
 
@@ -54,7 +52,7 @@ Continuation messages carry that text and its fetch time, avoiding repeated seas
 downloads for every chunk. Snapshots at least five minutes old are refreshed and
 the match is rechecked before sending. Missing, completed, or not-yet-due matches
 are skipped. A failed broadcast refresh throws before claiming the chunk, allowing
-Queue retries rather than sending stale backup data. This freshness change does
+Queue retries rather than sending stale match data. This freshness change does
 not change the existing chunk-claim or Telegram delivery guarantees.
 
 ## Commands
@@ -99,7 +97,7 @@ TELEGRAM_API_BASE="https://api.telegram.org"
 ### End-to-end test
 
 `npm test` runs deterministic schedule-policy tests with mocked VTB, Telegram,
-D1, and Queue calls. It checks live refreshes, command fallback, strict cron and
+D1, and Queue calls. It checks live refreshes, command unavailability, minimal cron fields, strict cron and
 broadcast refreshes, snapshot reuse/expiration, and refresh failures without network
 access. `npm run typecheck` checks the Worker source.
 
@@ -120,7 +118,7 @@ if live match data changes between requests, rerun the comparison.
 For a profile in the actual local Workers runtime, run `npm run dev`, press `D`,
 open the DevTools Profiler, start recording, issue several schedule commands, and
 stop recording after their Telegram replies arrive. Inspect JSON decoding, Zod
-parsing, backup serialization, and formatting in the bottom-up view. Use a separate
+parsing and formatting in the bottom-up view. Use a separate
 test bot or the Telegram mock. Compare cold season-cache requests with warm ones.
 
 Do not use `performance.now()` or `Date.now()` around synchronous parsing as a

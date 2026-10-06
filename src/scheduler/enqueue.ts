@@ -1,4 +1,4 @@
-import { getSchedule } from "../db/schedule";
+import { downloadScheduledGames } from "../api/vtb";
 import { logger } from "../logger";
 import type { Env, MatchBroadcastMessage } from "../types/env";
 import {
@@ -67,7 +67,7 @@ async function publish(env: Env, pending: PendingMatch[], now: number) {
  * rescheduled match gets a fresh message instead of being silently skipped.
  */
 export async function enqueueUpcomingMatches(env: Env): Promise<void> {
-  const { games } = await getSchedule(env);
+  const games = await downloadScheduledGames(env);
   const now = Date.now();
   const horizon = now + MAX_QUEUE_DELAY_SECONDS * 1000;
   const already = await getEnqueuedKeys(env);

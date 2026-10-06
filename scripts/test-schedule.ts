@@ -11,7 +11,7 @@ const bundle = await build({
       export { handleMessage } from './src/services/commands';
       export { broadcastMatch } from './src/services/notifications';
       export { enqueueUpcomingMatches } from './src/scheduler/enqueue';
-      export { getCurrentSeason, matchesResponseSchema } from './src/api/vtb';
+      export { getCurrentSeason, matchesResponseSchema, downloadScheduledGames } from './src/api/vtb';
       export { formatGames } from './src/services/gameFormatter';
     `,
     resolveDir: fileURLToPath(new URL("../", import.meta.url)),
@@ -21,7 +21,7 @@ const bundle = await build({
   format: "esm",
   write: false,
 });
-const { getSchedule, handleMessage, broadcastMatch, enqueueUpcomingMatches, getCurrentSeason, matchesResponseSchema, formatGames } =
+const { getSchedule, handleMessage, broadcastMatch, enqueueUpcomingMatches, getCurrentSeason, matchesResponseSchema, downloadScheduledGames, formatGames } =
   await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
 
 function fixture() {
@@ -36,7 +36,7 @@ function fixture() {
     noCurrentSeason: false,
     failSeasonWrite: false,
     failUpstream: false,
-    failWrite: false,
+    schedulerOnly: false,
     reads: 0,
     writes: 0,
     upstreamCalls: 0,
@@ -85,7 +85,6 @@ function fixture() {
               state.seasons.set(args[0], { season: args[1], fetched_at: args[2] });
             } else if (sql.includes("INTO schedule_cache")) {
               state.writes++;
-              if (state.failWrite) throw new Error("backup write failed");
               state.backup = { payload: args[0], fetched_at: args[1] };
             } else {
               assert.match(sql, /INTO sent_chunks/);
@@ -115,11 +114,15 @@ function fixture() {
     else state.seasonCalls++;
     if (state.failUpstream) throw new Error("upstream unavailable");
     if (url.includes("/matches?")) {
-      assert.deepEqual(new URL(url).searchParams.get("fields")?.split(",").sort(), [
+      const fields = new URL(url).searchParams.get("fields")?.split(",").sort();
+      assert.deepEqual(fields, state.schedulerOnly ? ["matchId", "matchTimeMSK"] : [
         "matchId", "matchStatus", "matchTimeMSK", "competitors.isHomeCompetitor",
         "competitors.scoreString", "competitors.teamName.ru", "customValues.externalBroadcast.url",
       ].sort());
-      return Response.json({ data: url.includes("/leagues/vtb/") ? [state.game] : [] });
+      const game = state.schedulerOnly
+        ? { matchId: state.game.matchId, matchTimeMSK: state.game.matchTimeMSK }
+        : state.game;
+      return Response.json({ data: url.includes("/leagues/vtb/") ? [game] : [] });
     }
     return Response.json({ data: [{ isCurrent: !state.noCurrentSeason, season: state.currentSeason }] });
   };
@@ -202,23 +205,23 @@ test("season cache", async (t) => {
   });
 });
 
-test("live schedule and fallback policies", async (t) => {
-  await t.test("every call fetches live data and updates the backup without reading it", async (t) => {
+test("live schedule policies", async (t) => {
+  await t.test("every call fetches live data without reading or writing the backup", async (t) => {
     const { state, env, fetchMock } = fixture();
     t.mock.method(globalThis, "fetch", fetchMock);
-    const first = await getSchedule(env, true);
+    const first = await getSchedule(env);
     state.game.customValues.externalBroadcast.url = "https://example.com/new";
-    const second = await getSchedule(env, true);
-    assert.equal(first.stale, false);
+    const second = await getSchedule(env);
+    assert.equal(first.games[0].customValues.externalBroadcast.url, "https://example.com/live");
     assert.equal(second.games[0].customValues.externalBroadcast.url, "https://example.com/new");
     assert.equal(state.upstreamCalls, 6);
     assert.equal(state.seasonCalls, 2);
     assert.equal(state.matchCalls, 4);
     assert.equal(state.reads, 0);
-    assert.equal(state.writes, 2);
+    assert.equal(state.writes, 0);
   });
 
-  await t.test("commands report stale backup data and its timestamp", async (t) => {
+  await t.test("commands report unavailability even when a legacy backup exists", async (t) => {
     const { state, env, fetchMock } = fixture();
     t.mock.method(globalThis, "fetch", fetchMock);
     state.backup = { payload: JSON.stringify([state.game]), fetched_at: Date.parse("2026-01-01T00:00:00Z") };
@@ -228,13 +231,14 @@ test("live schedule and fallback policies", async (t) => {
     }
     assert.equal(state.sent.length, 3);
     for (const reply of state.sent) {
-      assert.match(reply.text, /резервные данные/);
-      assert.match(reply.text.replaceAll("\\", ""), /2026-01-01T00:00:00.000Z/);
+      assert.match(reply.text, /временно недоступно/);
+      assert.ok(!reply.text.includes("резервные данные"));
     }
+    assert.equal(state.reads, 0);
     assert.equal(state.writes, 0);
   });
 
-  await t.test("all schedule commands request live data even with a fresh backup", async (t) => {
+  await t.test("all schedule commands request live data without saving a backup", async (t) => {
     const { state, env, fetchMock } = fixture();
     t.mock.method(globalThis, "fetch", fetchMock);
     for (const text of ["/today", "/soon", "/past"]) {
@@ -244,6 +248,7 @@ test("live schedule and fallback policies", async (t) => {
     assert.equal(state.seasonCalls, 2);
     assert.equal(state.matchCalls, 6);
     assert.equal(state.reads, 0);
+    assert.equal(state.writes, 0);
     assert.equal(state.sent.length, 3);
     assert.ok(state.sent.every((reply) => !reply.text.includes("резервные данные")));
   });
@@ -256,21 +261,29 @@ test("live schedule and fallback policies", async (t) => {
     assert.match(state.sent[0].text, /временно недоступно/);
   });
 
-  await t.test("a failed backup write does not discard live data", async (t) => {
+  await t.test("scheduler download contains only ID and time and validates them", async (t) => {
     const { state, env, fetchMock } = fixture();
     t.mock.method(globalThis, "fetch", fetchMock);
-    state.failWrite = true;
-    assert.equal((await getSchedule(env)).stale, false);
+    state.schedulerOnly = true;
+    assert.deepEqual(await downloadScheduledGames(env), [{
+      matchId: state.game.matchId, matchTimeMSK: state.game.matchTimeMSK,
+    }]);
+    state.game.matchId = "invalid" as any;
+    await assert.rejects(downloadScheduledGames(env));
     assert.equal(state.reads, 0);
+    assert.equal(state.writes, 0);
   });
 
-  await t.test("cron fetches on each run and never schedules from stale fallback", async (t) => {
+  await t.test("cron fetches only ID and time on each run without a backup", async (t) => {
     const { state, env, fetchMock } = fixture();
     t.mock.method(globalThis, "fetch", fetchMock);
+    state.schedulerOnly = true;
     state.game.matchTimeMSK = new Date(Date.now() + 60 * 60_000).toISOString();
     await enqueueUpcomingMatches(env);
     await enqueueUpcomingMatches(env);
     assert.equal(state.upstreamCalls, 6);
+    assert.deepEqual(state.queued, [{ matchId: 42, offset: 0 }, { matchId: 42, offset: 0 }]);
+    assert.equal(state.writes, 0);
     const queued = state.queued.length;
     state.failUpstream = true;
     await assert.rejects(enqueueUpcomingMatches(env), /upstream unavailable/);
