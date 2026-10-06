@@ -26,6 +26,10 @@ export const matchesResponseSchema = z.object({
   data: z.array(gameSchema),
 });
 
+const scheduledMatchesResponseSchema = z.object({
+  data: z.array(gameSchema.pick({ matchId: true, matchTimeMSK: true })),
+});
+
 async function getJson(url: string): Promise<unknown> {
   const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
@@ -62,6 +66,17 @@ export async function downloadGamesByLeague(env: Env, league: string): Promise<G
 
 export async function downloadGames(env: Env): Promise<Game[]> {
   const byLeague = await Promise.all(LEAGUES.map((league) => downloadGamesByLeague(env, league)));
+  return byLeague.flat();
+}
+
+export async function downloadScheduledGames(env: Env): Promise<Pick<Game, "matchId" | "matchTimeMSK">[]> {
+  const byLeague = await Promise.all(LEAGUES.map(async (league) => {
+    const season = await getCurrentSeason(env, league);
+    const url =
+      `${API_BASE}/leagues/${league}/seasons/${season.season}/matches` +
+      "?limit=500&fields=matchId,matchTimeMSK";
+    return scheduledMatchesResponseSchema.parse(await getJson(url)).data;
+  }));
   return byLeague.flat();
 }
 
